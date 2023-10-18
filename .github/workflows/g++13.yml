@@ -1,0 +1,173 @@
+name: g++-13
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule: 
+   - cron: '0 12 * * 0'
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'warning'
+        type: choice
+        options:
+        - info
+        - warning
+        - debug
+      tags:
+        description: 'Test scenario tags'
+        required: false
+        type: boolean
+      environment:
+        description: 'Environment to run tests against'
+        type: environment
+        required: false
+env:
+  IMAGE: "cross-gplusplus"
+  PACKAGE: "g++"
+  GCC_VERS: "13"
+  DEB_VER: "sid"
+jobs:
+  x86-64:
+    env:
+      PLATFORM: "linux/amd64,linux/arm64,linux/armel,linux/armhf,linux/386,linux/mips64le,linux/ppc64le,linux/s390x"
+      ARCH: x86-64-linux-gnu
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Prepare
+      run: docker buildx create --use
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v1
+    - name: Build
+      run: docker buildx build -t ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE}:latest -t ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE}:$(echo "${ARCH}" | cut -d'-' -f1) -t ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE}:${GCC_VERS}-$(echo "${ARCH}" | cut -d'-' -f1) --build-arg PACKAGES="${PACKAGE}" --build-arg ARCH="x86_64-linux-gnu" --build-arg DEB_VER="${DEB_VER}" --platform="${PLATFORM}" --push .
+  aarch64:
+    env:
+      PLATFORM: "linux/amd64,linux/386"
+      ARCH: aarch64-linux-gnu
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Prepare
+      run: docker buildx create --use
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v1
+    - name: Build
+      run: docker buildx build -t ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE}:$(echo "${ARCH}" | cut -d'-' -f1) -t ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE}:${GCC_VERS}-$(echo "${ARCH}" | cut -d'-' -f1) --build-arg PACKAGES="${PACKAGE}-${GCC_VERS}-${ARCH}" --build-arg ARCH="${ARCH}" --build-arg DEB_VER="${DEB_VER}" --platform="${PLATFORM}" --push .
+  armhf:
+    env:
+      PLATFORM: "linux/amd64,linux/arm64,linux/386"
+      ARCH: arm-linux-gnueabihf
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Prepare
+      run: docker buildx create --use
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v1
+    - name: Build
+      run: docker buildx build -t ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE}:"$(echo "${ARCH}" | cut -d'-' -f1)hf" -t ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE}:"${GCC_VERS}-$(echo "${ARCH}" | cut -d'-' -f1)hf" --build-arg PACKAGES="${PACKAGE}-${GCC_VERS}-${ARCH}" --build-arg ARCH="${ARCH}" --build-arg DEB_VER="${DEB_VER}" --platform="${PLATFORM}" --push .
+  i686:
+    env:
+      PLATFORM: "linux/amd64,linux/arm64,linux/ppc64le"
+      ARCH: i686-linux-gnu
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Prepare
+      run: docker buildx create --use
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v1
+    - name: Build
+      run: docker buildx build -t ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE}:$(echo "${ARCH}" | cut -d'-' -f1) -t ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE}:${GCC_VERS}-$(echo "${ARCH}" | cut -d'-' -f1) --build-arg PACKAGES="${PACKAGE}-${GCC_VERS}-${ARCH}" --build-arg ARCH="${ARCH}" --build-arg DEB_VER="${DEB_VER}" --platform="${PLATFORM}" --push .
+  ppc64:
+    env:
+      PLATFORM: "linux/amd64,linux/386"
+    strategy:
+      matrix:
+        ARCH:
+        - "powerpc64-linux-gnu"
+        - "powerpc64le-linux-gnu"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Prepare
+        run: docker buildx create --use
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Build
+        run: docker buildx build -t ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE}:$(echo "${{ matrix.ARCH }}" | cut -d'-' -f1) -t ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE}:${GCC_VERS}-$(echo "${{ matrix.ARCH }}" | cut -d'-' -f1) --build-arg PACKAGES="${PACKAGE}-${GCC_VERS}-${{ matrix.ARCH }}" --build-arg ARCH=${{ matrix.ARCH }} --build-arg DEB_VER=${DEB_VER} --platform=${PLATFORM} --push .
+  rest:
+    env:
+      PLATFORM: "linux/amd64,linux/arm64,linux/386,linux/ppc64le"
+    strategy:
+      matrix:
+        ARCH:
+        - "alpha-linux-gnu"
+        - "arc-linux-gnu"
+        - "arm-linux-gnueabi"
+        - "hppa-linux-gnu"
+        - "m68k-linux-gnu"
+        - "mips-linux-gnu"
+        - "mips64-linux-gnuabi64"
+        - "mips64el-linux-gnuabi64"
+        - "mipsel-linux-gnu"
+        - "mipsisa32r6-linux-gnu"
+        - "mipsisa32r6el-linux-gnu"
+        - "mipsisa64r6-linux-gnuabi64"
+        - "mipsisa64r6el-linux-gnuabi64"
+        - "powerpc-linux-gnu"
+        - "riscv64-linux-gnu"
+        - "s390x-linux-gnu"
+        - "sh4-linux-gnu"
+        - "sparc64-linux-gnu"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Prepare
+        run: docker buildx create --use
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Build
+        run: docker buildx build -t ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE}:$(echo "${{ matrix.ARCH }}" | cut -d'-' -f1) -t ${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE}:${GCC_VERS}-$(echo "${{ matrix.ARCH }}" | cut -d'-' -f1) --build-arg PACKAGES="${PACKAGE}-${GCC_VERS}-${{ matrix.ARCH }}" --build-arg ARCH=${{ matrix.ARCH }} --build-arg DEB_VER=${DEB_VER} --platform=${PLATFORM} --push .
